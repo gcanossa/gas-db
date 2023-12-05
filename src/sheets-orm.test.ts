@@ -17,11 +17,8 @@ describe("Row mapping", ()=>{
     };
 
     const headers: RangeHeaders = {
-      headers: ['Num','','','','Rank',''],
-      indexes: {
-        Num:0,
-        Rank:4
-      }
+      Num:0,
+      Rank:4
     };
 
     const row = rowFromEntity<typeof entity>(entity, mapping, headers);
@@ -37,11 +34,8 @@ describe("Row mapping", ()=>{
     };
 
     const headers: RangeHeaders = {
-      headers: ['Num','','','','Rank',''],
-      indexes: {
-        Num:0,
-        Rank:4
-      }
+      Num:0,
+      Rank:4
     };
 
     const entity:any = entityFromRow<any>([3,'test',null,null,1234], mapping, headers);

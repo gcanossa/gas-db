@@ -1,25 +1,45 @@
-export type StringFromType<T> = T extends string ? 'string' :
+export type CellValueType = 
+  | string
+  | number
+  | boolean
+  | Date
+  | null;
+
+export type StringFromType<T extends CellValueType> = 
+  T extends string ? 'string' :
   T extends number ? 'number' :
-  null;
+  T extends boolean ? 'boolean' :
+  T extends Date ? 'date' :
+  never;
 
-export type EntityPropertyMapping<T extends string|number> = {
-  type: StringFromType<T>;
-  colIndex?:number;
-  headerName?:string;
-};
+export type ColumnIdentifier = 
+  | { colIndex : number } 
+  | { headerName : string };
 
-export type ColumnsMapping<T extends object> = { 
-  [K in keyof T]: T[K] extends string|number ? EntityPropertyMapping<T[K]> : never
+export function getColumnId(column: ColumnIdentifier): number | string | null {
+  return 'colIndex' in column ? column.colIndex
+    : 'headerName' in column ? column.headerName
+    : null;
 }
 
-export type TableReadContext<T extends object> = {
+export type RowObject = { [ key: string]: CellValueType };
+
+export type EntityPropertyMapping<T extends CellValueType> = {
+  type: StringFromType<T>;
+} & ColumnIdentifier;
+
+export type ColumnsMapping<T extends RowObject> = { 
+  [K in keyof T]: T[K] extends CellValueType ? EntityPropertyMapping<T[K]> : never
+}
+
+export type TableReadContext<T extends RowObject> = {
   list(): T[];
   where(predicate: (p:T) => boolean): {index:number, item:T}[];
   find(predicate: (p:T) => boolean): T | null;
   findIndex(predicate: (p:T) => boolean): number;
 }
 
-export type TableWriteContext<T extends object> = {
+export type TableWriteContext<T extends RowObject> = {
   append(item: T): void;
   prepend(item: T): void;
   insertAt(item: T, index:number): void;
@@ -28,15 +48,14 @@ export type TableWriteContext<T extends object> = {
   updateAt(item: Partial<T>, index:number): void;
 }
 
-export type TableContext<T extends object> = TableReadContext<T> & TableWriteContext<T>;
+export type TableContext<T extends RowObject> = TableReadContext<T> & TableWriteContext<T>;
 
-export type DataRangeDescriptor = {
-  rangeName?: string; 
-  a1NotationRange?: string;
-  sheetName?: string;
-};
+export type DataRangeDescriptor = 
+  | { sheetName: string; }
+  | { rangeName: string }
+  | { a1NotationRange: string } ;
 
-export type RangeHeaders = { headers: string[], indexes: { [key: string]: number } }
+export type RangeHeaders = { [key: string]: number }
 
 export const getHeaders = (ss: GoogleAppsScript.Spreadsheet.Spreadsheet, params:DataRangeDescriptor): RangeHeaders => {
   const headers = getDataRange(ss, params, 1)?.offset(0,0,1)?.getValues()[0];
@@ -46,44 +65,49 @@ export const getHeaders = (ss: GoogleAppsScript.Spreadsheet.Spreadsheet, params:
   const indexes:any = {};
   headers.forEach((name, index) => { indexes[name]=index; });
 
-  return {
-    headers,
-    indexes
-  }
+  return indexes
 }
 
 export const getDataRange = (ss: GoogleAppsScript.Spreadsheet.Spreadsheet, params:DataRangeDescriptor, rowCount?:number) => {
-  const range = !!params.sheetName ? ss.getSheetByName(params.sheetName)?.getDataRange() ?? null :
-    !!params.rangeName ? ss.getRangeByName(params.rangeName) ?? null :
-    !!params.a1NotationRange ? ss.getRange(params.a1NotationRange) ?? null :
+  const range = 
+    'sheetName' in params ? ss.getSheetByName(params.sheetName)?.getDataRange() ?? null :
+    'rangeName' in params ? ss.getRangeByName(params.rangeName) ?? null :
+    'a1NotationRange' in params ? ss.getRange(params.a1NotationRange) ?? null :
     null;
 
   return rowCount !== undefined ? range?.offset(0,0,rowCount) : range;
 }
 
-export const shouldHaveHeaders = <T extends object>(columns:ColumnsMapping<T>) => {
-  return !!columns && !!Object.keys(columns).find(k => !!(columns as any)[k].headerName);
+export const shouldHaveHeaders = <T extends RowObject>(columns:ColumnsMapping<T>) => {
+  return !!columns && !!Object.keys(columns).find(k => 'headerName' in columns[k]);
 }
 
-export const entityFromRow = <T extends object>(row:any[], columns:ColumnsMapping<T>, headers?:RangeHeaders) => {
+export const entityFromRow = <T extends RowObject>(row:CellValueType[], columns:ColumnsMapping<T>, headers:RangeHeaders = {}) => {
   return Object.keys(columns).reduce((entity, prop)=> {
-    if((columns as any)[prop].colIndex === undefined && (columns as any)[prop].headerName === undefined)
+    const colId = getColumnId(columns[prop]);
+
+    if(colId === null)
       throw new Error(`Missing mapping information for column '${prop}'`);
 
-    (entity as any)[prop] = (columns as any)[prop].colIndex !== undefined ? 
-      row[(columns as any)[prop].colIndex] : row[(headers?.indexes as any)[(columns as any)[prop].headerName]??'*'];
+    entity[prop] = typeof colId === 'number' ? row[colId]
+      : typeof colId === 'string' ? row[headers[colId]]
+      : row[headers['*']];
 
     return entity;
-  }, {}) as T
+  }, {} as RowObject) as T
 }
 
-export const rowFromEntity = <T extends object>(entity:Partial<T>, columns:ColumnsMapping<T>, headers?:RangeHeaders): any[] => {
+export const rowFromEntity = <T extends RowObject>(entity:Partial<T>, columns:ColumnsMapping<T>, headers:RangeHeaders = {}): CellValueType[] => {
   const sortedProps = Object.keys(entity)
-    .map(prop => ({
-      prop,
-      index: ((columns as any)[prop].colIndex !== undefined ? 
-        (columns as any)[prop].colIndex : headers?.indexes[(columns as any)[prop].headerName??'*']) as (number | undefined)
-    }))
+    .map(prop => {
+      const id = getColumnId(columns[prop]);
+      return {
+          prop,
+          index: typeof id === 'number' ? id 
+            : typeof id === 'string' ? headers[id]
+            : headers['*']
+        }
+    })
     .filter(p => p.index !== undefined)
     .sort((a, b) => a.index! - b.index!);
   
@@ -91,16 +115,16 @@ export const rowFromEntity = <T extends object>(entity:Partial<T>, columns:Colum
     while(row.length < sortedProp.index!)
       row.push(null);
 
-    row.push((entity as any)[sortedProp.prop]);
+    row.push(entity[sortedProp.prop] ?? null);
 
     return row;
-  }, [] as any[])
+  }, [] as CellValueType[])
 }
 
-export const createTableReadContext = <T extends object>(
+export const createTableReadContext = <T extends RowObject>(
   spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
   range:DataRangeDescriptor,
-  columns: ColumnsMapping<T>):TableReadContext<T> => {
+  columns: ColumnsMapping<T>): TableReadContext<T> => {
   
   const table = createTableContext<T>(spreadsheet, range, columns);
 
@@ -114,10 +138,10 @@ export const createTableReadContext = <T extends object>(
   return ctx;
 };
 
-export const createTableContext = <T extends object>(
+export const createTableContext = <T extends RowObject>(
   spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
   range:DataRangeDescriptor,
-  columns: ColumnsMapping<T>):TableContext<T> => {
+  columns: ColumnsMapping<T>): TableContext<T> => {
   
   const withHeaders = shouldHaveHeaders(columns);
   const offsetTop = withHeaders ? 1 : 0;
@@ -170,14 +194,13 @@ export const createTableContext = <T extends object>(
       rowCount++;
     },
     deleteAt(index: number): void {
-      const newRange = getDataRange(spreadsheet, range)?.offset(index + offsetTop, 0, 1);
-      newRange?.deleteCells(SpreadsheetApp.Dimension.ROWS);
+      const oldRange = getDataRange(spreadsheet, range)?.offset(index + offsetTop, 0, 1);
+      oldRange?.deleteCells(SpreadsheetApp.Dimension.ROWS);
       rowCount--;
     },
     deleteAll():void {
       const originalRange = getDataRange(spreadsheet, range);
-      originalRange
-        ?.offset(offsetTop, 0, rowCount)?.clear();
+      originalRange?.offset(offsetTop, 0, rowCount)?.clear();
         
       rowCount = 0;
     },
