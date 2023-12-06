@@ -1,4 +1,4 @@
-import {describe, test, jest, expect} from '@jest/globals';
+import {describe, test, expect} from 'vitest';
 import { ColumnsMapping, entityFromRow, RangeHeaders, rowFromEntity } from './sheets-orm';
 
 describe("Row mapping", ()=>{
