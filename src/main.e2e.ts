@@ -5,7 +5,6 @@ function test(){
 
   const ss = !SPREADSHEET_ID ? SpreadsheetApp.getActive() : SpreadsheetApp.openById(SPREADSHEET_ID);
 
-
   const entity = {
     id: 3,
     name: 'test',
@@ -32,4 +31,6 @@ function test(){
   
   const a1_range_context = createTableContext<typeof entity>(ss, { a1NotationRange: "ranges!N5:R5" }, mapping);
   a1_range_context.append(entity);
+
+  console.log(a1_range_context.list());
 }

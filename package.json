@@ -1,11 +1,13 @@
 {
   "name": "@gcanossa/gas-db",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Google Apps Script Database microframework",
   "main": "index.js",
   "scripts": {
-    "build": "rollup --config --bundleConfigAsCjs",
-    "test": "jest"
+    "build": "vite build",
+    "test": "vitest run",
+    "pull": "clasp pull",
+    "deploy": "clasp push"
   },
   "repository": {
     "type": "git",

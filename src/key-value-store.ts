@@ -7,7 +7,7 @@ export type KVStoreValue =
  | boolean
  | object;
 
-export interface KVStore {
+export type KVStore = {
   clear(): void;
   delete(key: string): void;
   get(key: string): KVStoreValue | undefined;

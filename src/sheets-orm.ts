@@ -71,8 +71,8 @@ export const getHeaders = (ss: GoogleAppsScript.Spreadsheet.Spreadsheet, params:
 export const getDataRange = (ss: GoogleAppsScript.Spreadsheet.Spreadsheet, params:DataRangeDescriptor, rowCount?:number) => {
   const range = 
     'sheetName' in params ? ss.getSheetByName(params.sheetName)?.getDataRange() ?? null :
-    'rangeName' in params ? ss.getRangeByName(params.rangeName) ?? null :
-    'a1NotationRange' in params ? ss.getRange(params.a1NotationRange) ?? null :
+    'rangeName' in params ? ss.getRangeByName(params.rangeName)?.getDataRegion(SpreadsheetApp.Dimension.ROWS) ?? null :
+    'a1NotationRange' in params ? ss.getRange(params.a1NotationRange)?.getDataRegion(SpreadsheetApp.Dimension.ROWS) ?? null :
     null;
 
   return rowCount !== undefined ? range?.offset(0,0,rowCount) : range;
