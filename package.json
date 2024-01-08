@@ -1,10 +1,11 @@
 {
   "name": "@gcanossa/gas-db",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Google Apps Script Database microframework",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "vite build",
+    "build": "tsup",
+    "build-e2e": "vite build",
     "test": "vitest run",
     "pull": "clasp pull",
     "deploy": "clasp push"
@@ -33,6 +34,7 @@
   "homepage": "https://github.com/gcanossa/gas-db#readme",
   "devDependencies": {
     "@types/google-apps-script": "^1.0.78",
+    "tsup": "^8.0.1",
     "typescript": "^5.3.2",
     "vite": "^5.0.6",
     "vitest": "^1.0.1"
