@@ -1,11 +1,6 @@
-import { TableContext } from "./sheets-orm";
+import { ColumnDef, TableContext } from "./sheets-orm";
 
-export type KVStoreValue = 
- | string 
- | number
- | Date
- | boolean
- | object;
+export type KVStoreValue = string | number | Date | boolean | object;
 
 export type KVStore = {
   clear(): void;
@@ -13,11 +8,12 @@ export type KVStore = {
   get(key: string): KVStoreValue | undefined;
   has(key: string): boolean;
   set(key: string, value: KVStoreValue): void;
-  entries():{[key:string]:KVStoreValue}
-}
+  entries(): { [key: string]: KVStoreValue };
+};
 
-export const createPropertiesStore = (properties:GoogleAppsScript.Properties.Properties): KVStore => {
-  
+export const createPropertiesStore = (
+  properties: GoogleAppsScript.Properties.Properties
+): KVStore => {
   const store = {
     clear(): void {
       properties.deleteAllProperties();
@@ -27,8 +23,7 @@ export const createPropertiesStore = (properties:GoogleAppsScript.Properties.Pro
     },
     get(key: string): KVStoreValue | undefined {
       const el = properties.getProperty(key);
-      return !el ? undefined
-        : JSON.parse(el);
+      return !el ? undefined : JSON.parse(el);
     },
     has(key: string): boolean {
       return properties.getKeys().includes(key);
@@ -42,42 +37,41 @@ export const createPropertiesStore = (properties:GoogleAppsScript.Properties.Pro
         result[key] = JSON.parse(entries[key]);
         return result;
       }, {} as { [key: string]: KVStoreValue });
-    }
-  }
+    },
+  };
 
   return store;
-}
+};
 
-export const createSpreadsheetStore = (ctx:TableContext<{ key:string, value: string }>): KVStore => {
-  
+export const createSpreadsheetStore = (
+  ctx: TableContext<{ key: ColumnDef<string>; value: ColumnDef<string> }>
+): KVStore => {
   const store = {
     clear(): void {
       ctx.deleteAll();
     },
     delete(key: string): void {
-      ctx.deleteAt(ctx.findIndex(p => p.key === key));
+      ctx.deleteAt(ctx.findIndex((p) => p.key === key));
     },
     get(key: string): KVStoreValue | undefined {
-      const el = ctx.find(p => p.key === key);
+      const el = ctx.find((p) => p.key === key);
       return !el ? undefined : JSON.parse(el.value);
     },
     has(key: string): boolean {
-      return ctx.findIndex(p => p.key === key) >= 0;
+      return ctx.findIndex((p) => p.key === key) >= 0;
     },
     set(key: string, value: KVStoreValue): void {
-      const idx = ctx.findIndex(p => p.key === key);
-      if(idx >= 0)
-        ctx.updateAt({key, value: JSON.stringify(value)}, idx);
-      else
-        ctx.append({key, value: JSON.stringify(value)});
+      const idx = ctx.findIndex((p) => p.key === key);
+      if (idx >= 0) ctx.updateAt({ key, value: JSON.stringify(value) }, idx);
+      else ctx.append({ key, value: JSON.stringify(value) });
     },
     entries(): { [key: string]: KVStoreValue } {
-      return ctx.list().reduce((obj, item)=>{
+      return ctx.list().reduce((obj, item) => {
         obj[item.key] = JSON.parse(item.value);
         return obj;
       }, {} as { [key: string]: KVStoreValue });
-    }
-  }
+    },
+  };
 
   return store;
-}
+};

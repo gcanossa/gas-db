@@ -1,7 +1,6 @@
 import {
   ColumnsMapping,
   createTableContext,
-  createTableManagedContext,
   entityFromRow,
   numberCol,
   RangeHeaders,
