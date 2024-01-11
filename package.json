@@ -1,11 +1,30 @@
 {
   "name": "@gcanossa/gas-db",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Google Apps Script Database microframework",
-  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/sheets-orm.d.ts",
+      "default": "./dist/sheets-orm.js"
+    },
+    "./orm": {
+      "types": "./dist/sheets-orm.d.ts",
+      "default": "./dist/sheets-orm.js"
+    },
+    "./kv": {
+      "types": "./dist/key-value-store.d.ts",
+      "default": "./dist/key-value-store.js"
+    },
+    "./fs": {
+      "types": "./dist/drive-fs-util.d.ts",
+      "default": "./dist/drive-fs-util.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "type": "module",
   "scripts": {
-    "build": "tsup",
-    "build-e2e": "vite build",
+    "build": "vite build -c vite.config.ts",
+    "build-e2e": "vite build -c vite.config.e2e.ts",
     "test": "vitest run",
     "pull": "clasp pull",
     "deploy": "clasp push"
@@ -34,9 +53,9 @@
   "homepage": "https://github.com/gcanossa/gas-db#readme",
   "devDependencies": {
     "@types/google-apps-script": "^1.0.78",
-    "tsup": "^8.0.1",
     "typescript": "^5.3.2",
     "vite": "^5.0.6",
+    "vite-plugin-dts": "^3.7.0",
     "vitest": "^1.0.1"
   }
 }
