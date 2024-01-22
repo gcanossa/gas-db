@@ -1,4 +1,4 @@
-import { ColumnDef, TableContext } from "./sheets-orm";
+import { ColumnDef, Context } from "./sheets-orm";
 
 export type KVStoreValue = string | number | Date | boolean | object;
 
@@ -44,7 +44,7 @@ export const createPropertiesStore = (
 };
 
 export const createSpreadsheetStore = (
-  ctx: TableContext<{ key: ColumnDef<string>; value: ColumnDef<string> }>
+  ctx: Context<{ key: ColumnDef<string>; value: ColumnDef<string> }>
 ): KVStore => {
   const store = {
     clear(): void {
