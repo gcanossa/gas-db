@@ -1,12 +1,14 @@
 import {
   Context,
   add,
+  booleanCol,
   commit,
   count,
   createContext,
   createManagedContext,
   deleteAt,
   insertAt,
+  linkCol,
   list,
   numberCol,
   read,
@@ -73,9 +75,24 @@ function _test_suite(ctx: Context<typeof mapping>) {
   insertAt(
     ctx,
     [
-      { id: 0, name: "zero", score: 0 },
-      { id: 1, name: "one", score: 1 },
-      { id: 2, name: "two", score: 2 },
+      {
+        id: 0,
+        name: "zero",
+        score: false,
+        link: { url: "https://www.google.com", label: "Page 1" },
+      },
+      {
+        id: 1,
+        name: "one",
+        score: true,
+        link: { url: "https://www.google.com", label: "Page 2" },
+      },
+      {
+        id: 2,
+        name: "two",
+        score: true,
+        link: { url: "https://www.google.com", label: "Page 3" },
+      },
     ],
     0
   );
@@ -84,12 +101,30 @@ function _test_suite(ctx: Context<typeof mapping>) {
   assertEq(read(ctx).length, 4);
   assertEq(read(ctx)[0].id, 0);
 
-  insertAt(ctx, { id: 4, name: "four", score: 4 }, 0);
+  insertAt(
+    ctx,
+    {
+      id: 4,
+      name: "four",
+      score: false,
+      link: { url: "https://www.google.com", label: "Page 4" },
+    },
+    0
+  );
 
   assertEq(count(ctx), 5);
   assertEq(read(ctx)[0].id, 4);
 
-  insertAt(ctx, { id: 5, name: "five", score: 5 }, 1);
+  insertAt(
+    ctx,
+    {
+      id: 5,
+      name: "five",
+      score: true,
+      link: { url: "https://www.google.com", label: "Page 5" },
+    },
+    1
+  );
 
   assertEq(count(ctx), 6);
   assertEq(read(ctx)[0].id, 4);
@@ -99,9 +134,24 @@ function _test_suite(ctx: Context<typeof mapping>) {
   insertAt(
     ctx,
     [
-      { id: 0, name: "zero", score: 0 },
-      { id: 1, name: "one", score: 1 },
-      { id: 2, name: "two", score: 2 },
+      {
+        id: 0,
+        name: "zero",
+        score: false,
+        link: { url: "https://www.google.com", label: "Page 6" },
+      },
+      {
+        id: 1,
+        name: "one",
+        score: true,
+        link: { url: "https://www.google.com", label: "Page 7" },
+      },
+      {
+        id: 2,
+        name: "two",
+        score: false,
+        link: { url: "https://www.google.com", label: "Page 8" },
+      },
     ],
     0
   );
@@ -141,9 +191,24 @@ function _test_suite(ctx: Context<typeof mapping>) {
   insertAt(
     ctx,
     [
-      { id: 0, name: "zero", score: 0 },
-      { id: 1, name: "one", score: 1 },
-      { id: 2, name: "two", score: 2 },
+      {
+        id: 0,
+        name: "zero",
+        score: false,
+        link: { url: "https://www.google.com", label: "Page 9" },
+      },
+      {
+        id: 1,
+        name: "one",
+        score: true,
+        link: { url: "https://www.google.com", label: "Page 10" },
+      },
+      {
+        id: 2,
+        name: "two",
+        score: true,
+        link: { url: "https://www.google.com", label: "Page 11" },
+      },
     ],
     count(ctx) - 1,
     true
@@ -163,7 +228,12 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
   assertEq(count(ctx), total);
   assertEq(read(ctx).length, total);
 
-  let added = add(orm, { id: 10, name: "zero", score: 0 });
+  let added = add(orm, {
+    id: 10,
+    name: "zero",
+    score: false,
+    link: { url: "https://www.google.com", label: "Page 12" },
+  });
   let items = list(orm);
 
   assertEq(count(ctx), total);
@@ -188,7 +258,12 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
   assertEq(count(ctx), total);
   assertEq(read(ctx).length, total);
 
-  added = add(orm, { id: 10, name: "zero", score: 1 });
+  added = add(orm, {
+    id: 10,
+    name: "zero",
+    score: true,
+    link: { url: "https://www.google.com", label: "Page 13" },
+  });
   items = list(orm);
 
   assertEq(count(ctx), total);
@@ -210,7 +285,16 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
   });
 
   first = read(ctx)[0];
-  added = add(orm, { id: 100, name: "test", score: 1 }, 0);
+  added = add(
+    orm,
+    {
+      id: 100,
+      name: "test",
+      score: true,
+      link: { url: "https://www.google.com", label: "Page 14" },
+    },
+    0
+  );
 
   assertEq(list(orm)[0].id, 100);
   assertEq(list(orm)[1].id, first.id);
@@ -219,7 +303,16 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
 
   assertEq(list(orm)[0].id, first.id);
 
-  added = add(orm, { id: 200, name: "test", score: 1 }, 0);
+  added = add(
+    orm,
+    {
+      id: 200,
+      name: "test",
+      score: true,
+      link: { url: "https://www.google.com", label: "Page 15" },
+    },
+    0
+  );
 
   assertEq(list(orm)[0].id, 200);
   assertEq(list(orm)[1].id, first.id);
@@ -229,7 +322,16 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
   assertEq(list(orm)[0].id, first.id);
 
   first = read(ctx)[0];
-  added = add(orm, { id: 100, name: "test", score: 1 }, 0);
+  added = add(
+    orm,
+    {
+      id: 100,
+      name: "test",
+      score: true,
+      link: { url: "https://www.google.com", label: "Page 16" },
+    },
+    0
+  );
 
   assertEq(list(orm)[0].id, 100);
   assertEq(list(orm)[1].id, first.id);
@@ -238,7 +340,16 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
 
   assertEq(list(orm)[0].id, first.id);
 
-  added = add(orm, { id: 200, name: "test", score: 1 }, 0);
+  added = add(
+    orm,
+    {
+      id: 200,
+      name: "test",
+      score: true,
+      link: { url: "https://www.google.com", label: "Page 17" },
+    },
+    0
+  );
 
   assertEq(list(orm)[0].id, 200);
   assertEq(list(orm)[1].id, first.id);
@@ -254,7 +365,8 @@ const mapping = {
   id: numberCol("Num"),
   name: stringCol(1),
   seq: sequenceCol(2),
-  score: numberCol("Rank"),
+  score: booleanCol("Rank"),
+  link: linkCol("Link"),
 };
 
 function _test() {
@@ -276,7 +388,7 @@ function _test() {
   );
   const a1_range_context = createContext<typeof mapping>(
     ss,
-    { a1NotationRange: "ranges!N5:R5" },
+    { a1NotationRange: "ranges!O5:T5" },
     mapping
   );
 

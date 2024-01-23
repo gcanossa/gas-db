@@ -3,19 +3,17 @@ import {
   RowObject,
   UpdateRowObject,
   entityFromRow,
+  getColumnIndex,
   rowFromEntity,
   seqNext,
 } from "./core";
-import { ColumnDef, ColumnValueType, ColumnsMapping } from "./schema";
+import {
+  ColumnValueType,
+  ColumnsMapping,
+  PropOfTypeNames,
+  Sequence,
+} from "./schema";
 import { trimIndex } from "./utils";
-
-export type SequenceNames<T extends ColumnsMapping> = {
-  [K in keyof T]: T[K] extends ColumnDef<infer V>
-    ? V extends "sequence"
-      ? K
-      : never
-    : never;
-}[keyof T];
 
 export type DataRangeDescriptor =
   | { sheetName: string }
@@ -39,7 +37,9 @@ export type Context<T extends ColumnsMapping> = {
   rowCount: number;
   dataRange: GoogleAppsScript.Spreadsheet.Range;
   headers: RangeHeaders | null;
-  sequences: SequenceNames<T>[];
+  sequences: PropOfTypeNames<T, Sequence>[];
+  checkboxes: number[];
+  links: number[];
   propStore: GoogleAppsScript.Properties.Properties;
 };
 
@@ -96,6 +96,8 @@ export const createContext = <T extends ColumnsMapping>(
   const dataRange = getDataRange(spreadsheet, range);
   let rowCount = dataRange.getNumRows() - offsetTop;
 
+  const headers = withHeaders ? getHeaders(spreadsheet, range) : null;
+
   if (rowCount == 1) {
     const firstRow = dataRange.offset(offsetTop, 0, 1).getValues()[0];
     rowCount = !!firstRow.find((p) => p != "") ? rowCount : 0;
@@ -103,7 +105,15 @@ export const createContext = <T extends ColumnsMapping>(
 
   const sequences = Object.keys(columns).filter(
     (key) => columns[key][0] === "sequence"
-  ) as SequenceNames<T>[];
+  ) as PropOfTypeNames<T, Sequence>[];
+
+  const checkboxes: number[] = Object.keys(columns)
+    .filter((key) => columns[key][0] === "boolean")
+    .map((key) => getColumnIndex(columns[key], headers));
+
+  const links: number[] = Object.keys(columns)
+    .filter((key) => columns[key][0] === "link")
+    .map((key) => getColumnIndex(columns[key], headers));
 
   const prop =
     PropertiesService.getDocumentProperties() ??
@@ -114,11 +124,13 @@ export const createContext = <T extends ColumnsMapping>(
     range: range,
     columnsDef: columns,
     rowCount: rowCount,
-    headers: withHeaders ? getHeaders(spreadsheet, range) : null,
+    headers: headers,
     dataRange: dataRange,
     offsetTop: offsetTop,
     propStore: prop,
     sequences: sequences,
+    checkboxes: checkboxes,
+    links: links,
   };
 
   return ctx;
@@ -131,6 +143,18 @@ export function read<T extends ColumnsMapping>(
     ctx.rowCount > 0
       ? ctx.dataRange.offset(ctx.offsetTop, 0, ctx.rowCount).getValues() ?? []
       : [];
+
+  if (ctx.links.length > 0 && dataRange.length > 0) {
+    ctx.links.forEach((lnkIdx) => {
+      const formulas = ctx.dataRange
+        .offset(ctx.offsetTop, lnkIdx, ctx.rowCount, 1)
+        .getFormulas();
+
+      dataRange.forEach((row, rIdx) => {
+        row[lnkIdx] = formulas[rIdx][0];
+      });
+    });
+  }
 
   return dataRange.map((row) =>
     entityFromRow(row, ctx.columnsDef, ctx.headers)
@@ -175,7 +199,7 @@ export function insertAt<T extends ColumnsMapping>(
   if (!!formulas.find((p) => p != "")) {
     rows.forEach((row, rIdx) => {
       formulas.map((p, cIdx) => {
-        if (p != "") {
+        if (p != "" && !ctx.links.includes(cIdx)) {
           Array.from(p.matchAll(/([A-Z]+)([0-9]+)/g)).map((m) => {
             p = p.replace(
               m[0],
@@ -198,6 +222,9 @@ export function insertAt<T extends ColumnsMapping>(
       .offset(1 + appendOffset, 0, 1)
       .insertCells(SpreadsheetApp.Dimension.ROWS)
   );
+  ctx.checkboxes.forEach((idx) => {
+    newRange.offset(1 + appendOffset, idx, rows.length, 1).insertCheckboxes();
+  });
   newRange.offset(1 + appendOffset, 0, rows.length).setValues(rows);
 
   ctx.rowCount += rows.length;

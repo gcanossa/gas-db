@@ -2,25 +2,23 @@ import { describe, test, expect } from "vitest";
 import {
   ColumnsMapping,
   entityFromRow,
+  linkCol,
   numberCol,
   RangeHeaders,
   rowFromEntity,
   RowObject,
+  sequenceCol,
   stringCol,
 } from "./sheets-orm";
 
 describe("Row mapping", () => {
   test("Row from entity", () => {
-    const entity = {
-      id: 3,
-      name: "test",
-      score: 1234,
-    };
-
     const mapping: ColumnsMapping = {
       id: numberCol("Num"),
       name: stringCol(1),
       score: numberCol("Rank"),
+      lnk: linkCol(3),
+      serial: sequenceCol(5),
     };
 
     const headers: RangeHeaders = {
@@ -28,16 +26,33 @@ describe("Row mapping", () => {
       Rank: 4,
     };
 
+    const entity = {
+      id: 3,
+      name: "test",
+      score: 1234,
+      lnk: { url: "http://ciao", label: "ciao" },
+      serial: 1,
+    } satisfies RowObject<typeof mapping>;
+
     const row = rowFromEntity<typeof mapping>(entity, mapping, headers);
 
-    expect(row).toEqual([3, "test", null, null, 1234]);
+    expect(row).toEqual([
+      3,
+      "test",
+      null,
+      `=HYPERLINK("http://ciao","ciao")`,
+      1234,
+      1,
+    ]);
   });
 
   test("Entity from row", () => {
-    const mapping = {
+    const mapping: ColumnsMapping = {
       id: numberCol("Num"),
       name: stringCol(1),
       score: numberCol("Rank"),
+      lnk: linkCol(3),
+      serial: sequenceCol(5),
     };
 
     const headers: RangeHeaders = {
@@ -46,7 +61,7 @@ describe("Row mapping", () => {
     };
 
     const entity = entityFromRow<typeof mapping>(
-      [3, "test", null, null, 1234],
+      [3, "test", null, `=HYPERLINK("http://ciao", "ciao")`, 1234, 1],
       mapping,
       headers
     );
@@ -55,6 +70,8 @@ describe("Row mapping", () => {
       id: 3,
       name: "test",
       score: 1234,
+      lnk: { url: "http://ciao", label: "ciao" },
+      serial: 1,
     });
   });
 });
