@@ -1,15 +1,26 @@
-import { Context, count, deleteAt, insertAt, read, updateAt } from "./context";
+import {
+  ContextRef,
+  count,
+  deleteAt,
+  insertAt,
+  read,
+  updateAt,
+} from "./context";
 import { NewRowObject, RowObject } from "./core";
-import { ColumnValueType, ColumnsMapping } from "./schema";
-import { trimIndex } from "./utils";
+import { ColumnsMapping } from "./schema";
+import { createObjectRef, getObject, trimIndex } from "./utils";
 
-export type ManagedContext<T extends ColumnsMapping> = {
-  ctx: Context<T>;
+type ManagedContext<T extends ColumnsMapping> = {
+  ctx: ContextRef<T>;
   store: Entity<T>[];
   operationsLog: ManagedContextOperation<T>[];
 };
 
-export type Entity<T extends ColumnsMapping> = {
+export type ManagedContextRef<T extends ColumnsMapping> = {
+  __brand: "ManagedContextRef<T>";
+};
+
+type Entity<T extends ColumnsMapping> = {
   entity: RowObject<T>;
   isDirty: boolean;
   invalid?: boolean;
@@ -18,7 +29,7 @@ export type Entity<T extends ColumnsMapping> = {
   update(): void;
 };
 
-export type ManagedContextOperation<T extends ColumnsMapping> = {
+type ManagedContextOperation<T extends ColumnsMapping> = {
   entity: Entity<T>;
   type: "add" | "del";
   index: number;
@@ -69,89 +80,128 @@ export function createEntity<T extends ColumnsMapping>(
 }
 
 export function createManagedContext<T extends ColumnsMapping>(
-  ctx: Context<T>
-): ManagedContext<T> {
-  return {
+  ctx: ContextRef<T>
+): ManagedContextRef<T> {
+  return createObjectRef({
     ctx: ctx,
     store: [],
     operationsLog: [],
-  };
+  });
 }
 
 export function add<T extends ColumnsMapping>(
-  ctx: ManagedContext<T>,
+  ctx: ManagedContextRef<T>,
   item: NewRowObject<T>,
   index?: number
 ): RowObject<T> {
-  if (ctx.store.length == 0) refresh(ctx);
+  const pctx: ManagedContext<T> = getObject(ctx);
+  if (pctx.store.length == 0) refresh(ctx);
 
   const entity = createEntity(item as any as RowObject<T>);
   const idx =
-    index === undefined ? ctx.store.length : trimIndex(index, ctx.store.length);
-  ctx.store.splice(idx, 0, entity);
-  ctx.operationsLog.push({ entity: entity, type: "add", index: idx });
+    index === undefined
+      ? pctx.store.length
+      : trimIndex(index, pctx.store.length);
+  pctx.store.splice(idx, 0, entity);
+  pctx.operationsLog.push({ entity: entity, type: "add", index: idx });
 
   return entity.entity as RowObject<T>;
 }
 
 export function remove<T extends ColumnsMapping>(
-  ctx: ManagedContext<T>,
+  ctx: ManagedContextRef<T>,
   item: RowObject<T>
 ): void {
-  const idx = ctx.store.findIndex((p) => p.entity === item);
+  const pctx: ManagedContext<T> = getObject(ctx);
+  const idx = pctx.store.findIndex((p) => p.entity === item);
   if (idx < 0) return;
 
-  const entity = ctx.store.splice(idx, 1);
+  const entity = pctx.store.splice(idx, 1);
   entity[0].invalid = true;
-  ctx.operationsLog.push({ entity: entity[0], type: "del", index: idx });
+  pctx.operationsLog.push({ entity: entity[0], type: "del", index: idx });
 }
 
 export function list<T extends ColumnsMapping>(
-  ctx: ManagedContext<T>
+  ctx: ManagedContextRef<T>
 ): RowObject<T>[] {
-  if (ctx.store.length == 0) refresh(ctx);
+  const pctx: ManagedContext<T> = getObject(ctx);
+  if (pctx.store.length == 0) refresh(ctx);
 
-  return ctx.store.map((p) => p.entity as RowObject<T>);
+  return pctx.store.map((p) => p.entity as RowObject<T>);
 }
 
 export function refresh<T extends ColumnsMapping>(
-  ctx: ManagedContext<T>
+  ctx: ManagedContextRef<T>
 ): void {
-  ctx.store.forEach((p) => (p.invalid = true));
-  ctx.store = read(ctx.ctx).map((p) => createEntity(p));
+  const pctx: ManagedContext<T> = getObject(ctx);
+  pctx.store.forEach((p) => (p.invalid = true));
+  pctx.store = read(pctx.ctx).map((p) => createEntity(p));
 }
 
-export function rollback<T extends ColumnsMapping>(ctx: ManagedContext<T>) {
+export function rollback<T extends ColumnsMapping>(ctx: ManagedContextRef<T>) {
+  const pctx: ManagedContext<T> = getObject(ctx);
   let op: ManagedContextOperation<T>;
-  while ((op = ctx.operationsLog.pop())) {
+  while ((op = pctx.operationsLog.pop())) {
     if (op.type == "add") {
-      ctx.store.splice(op.index, 1);
+      pctx.store.splice(op.index, 1);
       op.entity.invalid = true;
     } else if (op.type == "del") {
-      ctx.store.splice(op.index, 0, op.entity);
+      pctx.store.splice(op.index, 0, op.entity);
       op.entity.invalid = false;
     }
   }
 
-  ctx.store.forEach((p) => p.reset());
+  pctx.store.forEach((p) => p.reset());
 }
-export function commit<T extends ColumnsMapping>(ctx: ManagedContext<T>) {
+export function commit<T extends ColumnsMapping>(ctx: ManagedContextRef<T>) {
+  const pctx: ManagedContext<T> = getObject(ctx);
   let op: ManagedContextOperation<T>;
-  while ((op = ctx.operationsLog.shift())) {
+  while ((op = pctx.operationsLog.shift())) {
     if (op.type == "add") {
       insertAt(
-        ctx.ctx,
+        pctx.ctx,
         op.entity.snapshot() as any,
-        op.index == count(ctx.ctx) ? op.index - 1 : op.index,
-        op.index == count(ctx.ctx)
+        op.index == count(pctx.ctx) ? op.index - 1 : op.index,
+        op.index == count(pctx.ctx)
       );
     } else if (op.type == "del") {
-      deleteAt(ctx.ctx, op.index);
+      deleteAt(pctx.ctx, op.index);
     }
   }
 
-  ctx.store.forEach((p, i) => {
-    updateAt(ctx.ctx, p.snapshot() as any, i);
+  pctx.store.forEach((p, i) => {
+    updateAt(pctx.ctx, p.snapshot() as any, i);
     p.update();
   });
+}
+
+export type ManagedContextGroup = {
+  commit(): void;
+  rollback(): void;
+  addContext(ctx: ManagedContextRef<any>): void;
+  removeContext(ctx: ManagedContextRef<any>): void;
+};
+
+export function createManagedContextGroup(
+  ...params: ManagedContextRef<any>[]
+): ManagedContextGroup {
+  const group = [...params];
+  return {
+    commit() {
+      group.forEach((ctx) => commit(ctx));
+    },
+    rollback() {
+      group.reduceRight((ctx) => {
+        rollback(ctx);
+        return null;
+      }, null);
+    },
+    addContext(ctx: ManagedContextRef<any>) {
+      if (!ctx) group.push(ctx);
+    },
+    removeContext(ctx: ManagedContextRef<any>) {
+      const idx = group.indexOf(ctx);
+      if (idx >= 0) group.splice(idx, 1);
+    },
+  };
 }

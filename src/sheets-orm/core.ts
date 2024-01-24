@@ -1,4 +1,3 @@
-import { RangeHeaders, Context } from "./context";
 import {
   ColumnDef,
   ColumnDefKind,
@@ -9,28 +8,29 @@ import {
   Sequence,
 } from "./schema";
 
+type ColumnDefValueType<
+  K extends string | number | symbol,
+  T extends Record<K, any>
+> = T[K] extends ColumnDef<infer V>
+  ? V extends "sequence"
+    ? number
+    : V extends "link"
+    ? Link
+    : V
+  : never;
+
 export type RowObject<T> = T extends ColumnsMapping
   ? {
-      [K in keyof T]: T[K] extends ColumnDef<infer V>
-        ? V extends "sequence"
-          ? number
-          : V extends "link"
-          ? Link
-          : V
-        : never;
+      [K in keyof T]: ColumnDefValueType<K, T>;
     }
   : never;
 
 export type NewRowObject<T> = T extends ColumnsMapping
   ? {
-      [K in Exclude<
-        keyof T,
-        PropOfTypeNames<T, Sequence>
-      >]: T[K] extends ColumnDef<infer V>
-        ? V extends "link"
-          ? Link
-          : V
-        : never;
+      [K in Exclude<keyof T, PropOfTypeNames<T, Sequence>>]: ColumnDefValueType<
+        K,
+        T
+      >;
     }
   : never;
 
@@ -38,8 +38,10 @@ export type UpdateRowObject<T> = T extends ColumnsMapping
   ? Partial<NewRowObject<T>>
   : never;
 
+export type RangeHeaders = { [key: string]: number };
+
 export function getColumnIndex(
-  [type, colId]: ColumnDefKind,
+  { type, id: colId }: ColumnDefKind,
   headers: RangeHeaders = {}
 ) {
   return typeof colId === "number"
@@ -59,7 +61,7 @@ export function entityFromRow<T>(
       throw new Error(`Missing mapping information for column '${prop}'`);
 
     const idx = getColumnIndex(columns[prop], headers);
-    if (columns[prop][0] == "link" && !!row[idx]) {
+    if (columns[prop].type == "link" && !!row[idx]) {
       const mc = (row[idx] as string).match(
         /=HYPERLINK\("([^,]*)"(\s*,\s*"(.*)")?\)/
       );
@@ -82,7 +84,7 @@ export function rowFromEntity<T>(
 ): ColumnValueType[] {
   const sortedProps = Object.keys(entity)
     .map((prop) => {
-      const id = columns[prop][1];
+      const id = columns[prop].id;
       return {
         prop,
         index: getColumnIndex(columns[prop], headers),
@@ -95,7 +97,7 @@ export function rowFromEntity<T>(
     while (row.length < sortedProp.index!) row.push(null);
 
     let value = (entity[sortedProp.prop] as ColumnValueType) ?? null;
-    if (columns[sortedProp.prop][0] == "link" && !!value) {
+    if (columns[sortedProp.prop].type == "link" && !!value) {
       const lnk = value as any as Link;
       value = `=HYPERLINK("${lnk.url}"${lnk.label ? `,"${lnk.label}"` : ""})`;
     }
@@ -103,41 +105,4 @@ export function rowFromEntity<T>(
 
     return row;
   }, [] as ColumnValueType[]);
-}
-function seqEntryName<T extends ColumnsMapping>(
-  ctx: Context<T>,
-  key: PropOfTypeNames<T, Sequence>
-): string {
-  return Utilities.base64Encode(
-    Utilities.computeDigest(
-      Utilities.DigestAlgorithm.SHA_256,
-      `${ctx.spreadsheet.getId()}/${JSON.stringify(ctx.range)}/${String(key)}`
-    )
-  );
-}
-
-export function seqCurrent<T extends ColumnsMapping>(
-  ctx: Context<T>,
-  key: PropOfTypeNames<T, Sequence>
-): number | null {
-  const value = ctx.propStore.getProperty(seqEntryName(ctx, key));
-  return !value ? null : parseInt(value);
-}
-export function seqNext<T extends ColumnsMapping>(
-  ctx: Context<T>,
-  key: PropOfTypeNames<T, Sequence>
-): number {
-  const entryName = seqEntryName(ctx, key);
-  const value = ctx.propStore.getProperty(entryName);
-  const nextValue = !value ? 1 : parseInt(value) + 1;
-
-  ctx.propStore.setProperty(entryName, `${nextValue}`);
-  return nextValue;
-}
-export function seqReset<T extends ColumnsMapping>(
-  ctx: Context<T>,
-  key: PropOfTypeNames<T, Sequence>,
-  value?: number
-): void {
-  ctx.propStore.setProperty(seqEntryName(ctx, key), `${value ?? 0}`);
 }

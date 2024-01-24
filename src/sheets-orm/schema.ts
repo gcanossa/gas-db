@@ -46,10 +46,11 @@ export type ColumnValueTypeName<T extends ColumnValueType> = T extends Sequence
   ? "date"
   : never;
 
-export type ColumnDef<T extends ColumnValueType> = [
-  ColumnValueTypeName<T>,
-  number | string
-];
+export type ColumnDef<T extends ColumnValueType> = {
+  type: ColumnValueTypeName<T>;
+  id: number | string;
+  pk?: boolean;
+};
 export type ColumnDefKind = ColumnDef<ColumnValueType>;
 
 export type PropOfTypeNames<T extends ColumnsMapping, P> = {
@@ -64,26 +65,32 @@ export type ColumnsMapping = {
   [key: string]: ColumnDefKind;
 };
 
+export function primaryKey<T extends ColumnValueType>(
+  def: ColumnDef<T>
+): ColumnDef<T> {
+  return { ...def, pk: true };
+}
+
 export function stringCol(id: number | string): ColumnDef<string> {
-  return ["string", id];
+  return { type: "string", id };
 }
 
 export function numberCol(id: number | string): ColumnDef<number> {
-  return ["number", id];
+  return { type: "number", id };
 }
 
 export function booleanCol(id: number | string): ColumnDef<boolean> {
-  return ["boolean", id];
+  return { type: "boolean", id };
 }
 
 export function dateCol(id: number | string): ColumnDef<Date> {
-  return ["date", id];
+  return { type: "date", id };
 }
 
 export function sequenceCol(id: number | string): ColumnDef<Sequence> {
-  return ["sequence", id];
+  return { type: "sequence", id };
 }
 
 export function linkCol(id: number | string): ColumnDef<Link> {
-  return ["link", id];
+  return { type: "link", id };
 }

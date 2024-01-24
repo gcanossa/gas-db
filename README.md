@@ -7,7 +7,7 @@ Google Apps Script Database microframework
 In order to install the package simply execute the command:
 
 ```
-npm i -D @gcanossa/gas-db
+npm i @gcanossa/gas-db
 ```
 
 ## Usage
@@ -47,8 +47,8 @@ dstore.set("key", { name: "test", age: 18 });
 In order to use a **Spreadsheet range** as backing storage:
 
 ```ts
-//details below on what 'createTableContext' does
-const tableContext = createTableContext<{ key: string; value: string }>(
+//details below on what 'createContext' does
+const tableContext = createContext<{ key: string; value: string }>(
   spreadsheet,
   range,
   mapping
@@ -69,7 +69,7 @@ const mapping = {
   name: dateCol(2),
 };
 
-const table = createTableContext<typeof mapping>(
+const table = createContext<typeof mapping>(
   ss,
   { sheetName: "People" },
   mapping
@@ -77,23 +77,6 @@ const table = createTableContext<typeof mapping>(
 ```
 
 The created controller satisfies the following specification:
-
-```ts
-export type RowObject<T> = T extends ColumnsMapping
-  ? {
-      [K in keyof T]: T[K] extends ColumnDef<infer V> ? V : never;
-    }
-  : never;
-
-export type TableWriteContext<T extends ColumnsMapping> = {
-  append(item: RowObject<T>): void;
-  prepend(item: RowObject<T>): void;
-  insertAt(item: RowObject<T>, index: number): void;
-  deleteAt(index: number): void;
-  deleteAll(): void;
-  updateAt(item: Partial<RowObject<T>>, index: number): void;
-};
-```
 
 It is possibile to specify a range in multiple ways:
 

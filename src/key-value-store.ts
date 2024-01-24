@@ -1,4 +1,12 @@
-import { ColumnDef, Context } from "./sheets-orm";
+import {
+  ColumnDef,
+  ContextRef,
+  count,
+  deleteAt,
+  insertAt,
+  read,
+  updateAt,
+} from "./sheets-orm";
 
 export type KVStoreValue = string | number | Date | boolean | object;
 
@@ -44,29 +52,41 @@ export const createPropertiesStore = (
 };
 
 export const createSpreadsheetStore = (
-  ctx: Context<{ key: ColumnDef<string>; value: ColumnDef<string> }>
+  ctx: ContextRef<{ key: ColumnDef<string>; value: ColumnDef<string> }>
 ): KVStore => {
   const store = {
     clear(): void {
-      ctx.deleteAll();
+      deleteAt(ctx, 0, count(ctx));
     },
     delete(key: string): void {
-      ctx.deleteAt(ctx.findIndex((p) => p.key === key));
+      const items = read(ctx);
+      const idx = items.findIndex((p) => p.key === key);
+      if (idx >= 0) deleteAt(ctx, idx);
     },
     get(key: string): KVStoreValue | undefined {
-      const el = ctx.find((p) => p.key === key);
+      const items = read(ctx);
+      const el = items.find((p) => p.key === key);
       return !el ? undefined : JSON.parse(el.value);
     },
     has(key: string): boolean {
-      return ctx.findIndex((p) => p.key === key) >= 0;
+      const items = read(ctx);
+      const idx = items.findIndex((p) => p.key === key);
+      return idx >= 0;
     },
     set(key: string, value: KVStoreValue): void {
-      const idx = ctx.findIndex((p) => p.key === key);
-      if (idx >= 0) ctx.updateAt({ key, value: JSON.stringify(value) }, idx);
-      else ctx.append({ key, value: JSON.stringify(value) });
+      const items = read(ctx);
+      const idx = items.findIndex((p) => p.key === key);
+      if (idx >= 0) updateAt(ctx, { key, value: JSON.stringify(value) }, idx);
+      else
+        insertAt(
+          ctx,
+          { key, value: JSON.stringify(value) },
+          items.length,
+          true
+        );
     },
     entries(): { [key: string]: KVStoreValue } {
-      return ctx.list().reduce((obj, item) => {
+      return read(ctx).reduce((obj, item) => {
         obj[item.key] = JSON.parse(item.value);
         return obj;
       }, {} as { [key: string]: KVStoreValue });

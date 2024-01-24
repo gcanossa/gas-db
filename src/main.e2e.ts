@@ -1,16 +1,18 @@
 import {
-  Context,
+  ContextRef,
   add,
   booleanCol,
   commit,
   count,
   createContext,
   createManagedContext,
+  createManagedContextGroup,
   deleteAt,
   insertAt,
   linkCol,
   list,
   numberCol,
+  primaryKey,
   read,
   remove,
   rollback,
@@ -64,7 +66,7 @@ function doTest(name: string, fn: () => void) {
   showTestResults();
 }
 
-function _test_suite(ctx: Context<typeof mapping>) {
+function _test_suite(ctx: ContextRef<typeof mapping>) {
   deleteAt(ctx, 0, count(ctx) - 1);
   seqReset(ctx, "seq", 0);
   console.log("Range cleared");
@@ -220,7 +222,7 @@ function _test_suite(ctx: Context<typeof mapping>) {
   assertEq(read(ctx)[count(ctx) - 1].id, 2);
 }
 
-function _test_suite_managed(ctx: Context<typeof mapping>) {
+function _test_suite_managed(ctx: ContextRef<typeof mapping>) {
   const orm = createManagedContext(ctx);
 
   let total = count(ctx);
@@ -362,7 +364,7 @@ function _test_suite_managed(ctx: Context<typeof mapping>) {
 }
 
 const mapping = {
-  id: numberCol("Num"),
+  id: primaryKey(numberCol("Num")),
   name: stringCol(1),
   seq: sequenceCol(2),
   score: booleanCol("Rank"),
@@ -398,4 +400,9 @@ function _test() {
   doTest("named managed", () => _test_suite_managed(named_range_context));
   doTest("a1", () => _test_suite(a1_range_context));
   doTest("a1 managed", () => _test_suite_managed(a1_range_context));
+
+  createManagedContextGroup(
+    createManagedContext(table_context),
+    createManagedContext(a1_range_context)
+  );
 }
