@@ -1,21 +1,23 @@
 import {
   ColumnDef,
   ColumnDefKind,
+  ColumnDefVariant,
   ColumnValueType,
   ColumnsMapping,
   Link,
+  PkColumnDef,
   PropOfTypeNames,
+  PropOfVariantNames,
+  ReadOnlyColumnDef,
   Sequence,
 } from "./schema";
 
 type ColumnDefValueType<
   K extends string | number | symbol,
   T extends Record<K, any>
-> = T[K] extends ColumnDef<infer V>
-  ? V extends "sequence"
+> = T[K] extends ColumnDefVariant<infer V>
+  ? V extends Sequence
     ? number
-    : V extends "link"
-    ? Link
     : V
   : never;
 
@@ -27,10 +29,11 @@ export type RowObject<T> = T extends ColumnsMapping
 
 export type NewRowObject<T> = T extends ColumnsMapping
   ? {
-      [K in Exclude<keyof T, PropOfTypeNames<T, Sequence>>]: ColumnDefValueType<
-        K,
-        T
-      >;
+      [K in Exclude<
+        keyof T,
+        | PropOfTypeNames<T, Sequence>
+        | PropOfVariantNames<T, ReadOnlyColumnDef<any>>
+      >]: ColumnDefValueType<K, T>;
     }
   : never;
 

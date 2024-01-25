@@ -1,6 +1,11 @@
 import { ContextMetadataStore, DataRangeDescriptor } from "./context";
 import { RangeHeaders } from "./core";
-import { ColumnsMapping, PropOfTypeNames, Sequence } from "./schema";
+import {
+  ColumnsMapping,
+  FormulaColumnDef,
+  PropOfTypeNames,
+  Sequence,
+} from "./schema";
 
 export function trimIndex(index: number, count: number) {
   if (!count) return 0;
@@ -10,10 +15,9 @@ export function trimIndex(index: number, count: number) {
 }
 
 export function getHeaders(
-  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
-  params: DataRangeDescriptor
+  dataRange: GoogleAppsScript.Spreadsheet.Range
 ): RangeHeaders {
-  const headers = getDataRange(ss, params, 1)?.offset(0, 0, 1)?.getValues()[0];
+  const headers = dataRange?.offset(0, 0, 1)?.getValues()[0];
   if (!headers) throw new Error("Missing header row");
 
   return headers.reduce(
@@ -23,6 +27,36 @@ export function getHeaders(
     }),
     {}
   );
+}
+
+export function getFormulas(
+  dataRange: GoogleAppsScript.Spreadsheet.Range
+): string[] {
+  const formulas = dataRange?.offset(1, 0, 1)?.getFormulas()[0];
+  if (!formulas) throw new Error("Missing header row");
+
+  return formulas;
+}
+
+export function offsetFormulas(
+  formulas: string[],
+  offset: number,
+  skipIdx: number[]
+): string[] {
+  const newFormulas = [...formulas];
+  newFormulas
+    .map((value, idx) =>
+      value != "" && !skipIdx.includes(idx) ? { value, idx } : null
+    )
+    .filter((p) => !!p)
+    .forEach(({ value, idx }) => {
+      Array.from(value.matchAll(/([A-Z]+)([0-9]+)/g)).map((m) => {
+        value = value.replace(m[0], `${m[1]}${parseInt(m[2]) + offset}`);
+      });
+
+      newFormulas[idx] = value;
+    });
+  return newFormulas;
 }
 
 export function getDataRange(
@@ -53,6 +87,15 @@ export function shouldHaveHeaders<T extends ColumnsMapping>(columns: T) {
   );
 }
 
+export function hasFormulaColumns<T extends ColumnsMapping>(columns: T) {
+  return (
+    !!columns &&
+    !!Object.keys(columns).find(
+      (k) => !!(columns[k] as FormulaColumnDef<any>)?.frm
+    )
+  );
+}
+
 export type Context<T extends ColumnsMapping> = {
   spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet;
   rangeDef: DataRangeDescriptor;
@@ -61,10 +104,13 @@ export type Context<T extends ColumnsMapping> = {
   rowCount: number;
   dataRange: GoogleAppsScript.Spreadsheet.Range;
   headers: RangeHeaders | null;
-  sequences: PropOfTypeNames<T, Sequence>[];
-  checkboxes: number[];
-  links: number[];
+  sequenceNames: PropOfTypeNames<T, Sequence>[];
+  readonlyIdxes: number[];
+  checkboxeIdxes: number[];
+  linkIdxes: number[];
   metadata: ContextMetadataStore;
+  formulas: string[];
+  formulaIdxes: number[];
 };
 
 const objectStore: [any, any][] = [];

@@ -1,5 +1,8 @@
 import {
   ContextRef,
+  PkColumnDef,
+  PropOfVariantNames,
+  ReadOnlyColumnDef,
   add,
   booleanCol,
   commit,
@@ -8,12 +11,14 @@ import {
   createManagedContext,
   createManagedContextGroup,
   deleteAt,
+  formula,
   insertAt,
   linkCol,
   list,
   numberCol,
   primaryKey,
   read,
+  readonly,
   remove,
   rollback,
   seqReset,
@@ -67,14 +72,14 @@ function doTest(name: string, fn: () => void) {
 }
 
 function _test_suite(ctx: ContextRef<typeof mapping>) {
-  deleteAt(ctx, 0, count(ctx) - 1);
+  deleteAt(ctx, 0, count(ctx));
   seqReset(ctx, "seq", 0);
   console.log("Range cleared");
 
-  assertEq(count(ctx), 1);
-  assertEq(read(ctx).length, 1);
+  assertEq(count(ctx), 0);
+  assertEq(read(ctx).length, 0);
 
-  insertAt(
+  let inserted = insertAt(
     ctx,
     [
       {
@@ -99,9 +104,12 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
     0
   );
 
-  assertEq(count(ctx), 4);
-  assertEq(read(ctx).length, 4);
+  assertEq(count(ctx), 3);
+  assertEq(read(ctx).length, 3);
   assertEq(read(ctx)[0].id, 0);
+  assertEq(read(ctx)[0].fseq, read(ctx)[0].seq * 2);
+  assertEq(read(ctx)[0].seq, inserted[0].seq);
+  assertEq(read(ctx)[2].seq, inserted[2].seq);
 
   insertAt(
     ctx,
@@ -114,7 +122,7 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
     0
   );
 
-  assertEq(count(ctx), 5);
+  assertEq(count(ctx), 4);
   assertEq(read(ctx)[0].id, 4);
 
   insertAt(
@@ -128,7 +136,7 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
     1
   );
 
-  assertEq(count(ctx), 6);
+  assertEq(count(ctx), 5);
   assertEq(read(ctx)[0].id, 4);
   assertEq(read(ctx)[1].id, 5);
   assertEq(read(ctx)[2].id, 0);
@@ -158,35 +166,35 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
     0
   );
 
-  assertEq(count(ctx), 9);
-  assertEq(read(ctx).length, 9);
+  assertEq(count(ctx), 8);
+  assertEq(read(ctx).length, 8);
   assertEq(read(ctx)[0].id, 0);
   assertEq(read(ctx)[3].id, 4);
 
   deleteAt(ctx, 0);
 
-  assertEq(count(ctx), 8);
-  assertEq(read(ctx).length, 8);
+  assertEq(count(ctx), 7);
+  assertEq(read(ctx).length, 7);
   assertEq(read(ctx)[0].id, 1);
 
   deleteAt(ctx, 1);
 
-  assertEq(count(ctx), 7);
-  assertEq(read(ctx).length, 7);
+  assertEq(count(ctx), 6);
+  assertEq(read(ctx).length, 6);
   assertEq(read(ctx)[0].id, 1);
   assertEq(read(ctx)[1].id, 4);
 
   updateAt(ctx, { id: 10 }, 0);
 
-  assertEq(count(ctx), 7);
-  assertEq(read(ctx).length, 7);
+  assertEq(count(ctx), 6);
+  assertEq(read(ctx).length, 6);
   assertEq(read(ctx)[0].id, 10);
   assertEq(read(ctx)[1].id, 4);
 
   updateAt(ctx, [{ id: 20 }, { id: 21 }], 0);
 
-  assertEq(count(ctx), 7);
-  assertEq(read(ctx).length, 7);
+  assertEq(count(ctx), 6);
+  assertEq(read(ctx).length, 6);
   assertEq(read(ctx)[0].id, 20);
   assertEq(read(ctx)[1].id, 21);
 
@@ -216,8 +224,8 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
     true
   );
 
-  assertEq(count(ctx), 10);
-  assertEq(read(ctx).length, 10);
+  assertEq(count(ctx), 9);
+  assertEq(read(ctx).length, 9);
   assertEq(read(ctx)[count(ctx) - 2].id, 1);
   assertEq(read(ctx)[count(ctx) - 1].id, 2);
 }
@@ -367,6 +375,7 @@ const mapping = {
   id: primaryKey(numberCol("Num")),
   name: stringCol(1),
   seq: sequenceCol(2),
+  fseq: formula(numberCol(3)),
   score: booleanCol("Rank"),
   link: linkCol("Link"),
 };

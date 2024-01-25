@@ -10,6 +10,7 @@ import {
   ColumnValueType,
   ColumnsMapping,
   PropOfTypeNames,
+  ReadOnlyColumnDef,
   Sequence,
 } from "./schema";
 import { seqNext } from "./sequences";
@@ -17,8 +18,11 @@ import {
   Context,
   createObjectRef,
   getDataRange,
+  getFormulas,
   getHeaders,
   getObject,
+  hasFormulaColumns,
+  offsetFormulas,
   shouldHaveHeaders,
   trimIndex,
 } from "./utils";
@@ -42,10 +46,17 @@ export function createContext<T extends ColumnsMapping>(
   metadata?: ContextMetadataStore
 ): ContextRef<T> {
   const withHeaders = shouldHaveHeaders(columns);
-  const offsetTop = withHeaders ? 1 : 0;
-  const headers = withHeaders ? getHeaders(spreadsheet, range) : null;
+  const withFormulas = hasFormulaColumns(columns);
 
   const dataRange = getDataRange(spreadsheet, range);
+
+  const offsetTop = (withHeaders ? 1 : 0) + (withFormulas ? 1 : 0);
+  const headers = withHeaders ? getHeaders(dataRange) : null;
+  const formulas = withFormulas ? getFormulas(dataRange) : null;
+  const formulaIdxes = formulas
+    ?.map((p, i) => (p != "" ? i : null))
+    .filter((p) => p != null);
+
   let rowCount = dataRange.getNumRows() - offsetTop;
 
   if (rowCount == 1) {
@@ -63,6 +74,10 @@ export function createContext<T extends ColumnsMapping>(
 
   const links: number[] = Object.keys(columns)
     .filter((key) => columns[key].type === "link")
+    .map((key) => getColumnIndex(columns[key], headers));
+
+  const readonlys: number[] = Object.keys(columns)
+    .filter((key) => !!(columns[key] as ReadOnlyColumnDef<any>)?.ro)
     .map((key) => getColumnIndex(columns[key], headers));
 
   if (!metadata) {
@@ -88,9 +103,12 @@ export function createContext<T extends ColumnsMapping>(
     dataRange: dataRange,
     offsetTop: offsetTop,
     metadata: metadata,
-    sequences: sequences,
-    checkboxes: checkboxes,
-    links: links,
+    sequenceNames: sequences,
+    checkboxeIdxes: checkboxes,
+    linkIdxes: links,
+    formulas: formulas,
+    readonlyIdxes: readonlys,
+    formulaIdxes: formulaIdxes,
   };
 
   return createObjectRef(ctx);
@@ -107,8 +125,8 @@ export function read<T extends ColumnsMapping>(
         []
       : [];
 
-  if (pctx.links.length > 0 && dataRange.length > 0) {
-    pctx.links.forEach((lnkIdx) => {
+  if (pctx.linkIdxes.length > 0 && dataRange.length > 0) {
+    pctx.linkIdxes.forEach((lnkIdx) => {
       const formulas = pctx.dataRange
         .offset(pctx.offsetTop, lnkIdx, pctx.rowCount, 1)
         .getFormulas();
@@ -134,7 +152,7 @@ export function insertAt<T extends ColumnsMapping>(
   inserts: NewRowObject<T> | NewRowObject<T>[],
   index: number,
   append?: boolean
-): void {
+) {
   const pctx: Context<T> = getObject(ctx);
   index = trimIndex(index, pctx.rowCount);
 
@@ -142,7 +160,7 @@ export function insertAt<T extends ColumnsMapping>(
   const items = Array.isArray(inserts) ? inserts : [inserts];
 
   const rows: ColumnValueType[][] = items.map((item) => {
-    pctx.sequences.map((key) => {
+    pctx.sequenceNames.map((key) => {
       (item as Record<keyof T, any>)[key] = seqNext(ctx, key);
     });
     return rowFromEntity<T>(
@@ -152,47 +170,41 @@ export function insertAt<T extends ColumnsMapping>(
     );
   });
 
-  const newRange = pctx.dataRange.offset(index + pctx.offsetTop - 1, 0, 2);
+  const position = pctx.offsetTop + index + appendOffset;
 
-  let formulas = newRange.offset(1, 0, 1).getFormulas()[0];
-  let formulaFromAbove = false;
-  if (!formulas.find((p) => p != "")) {
-    formulas = newRange.offset(0, 0, 1).getFormulas()[0];
-    formulaFromAbove = true;
-  }
+  const newRange = pctx.dataRange.offset(position, 0, 1);
 
-  if (!!formulas.find((p) => p != "")) {
-    rows.forEach((row, rIdx) => {
-      formulas.map((p, cIdx) => {
-        if (p != "" && !pctx.links.includes(cIdx)) {
-          Array.from(p.matchAll(/([A-Z]+)([0-9]+)/g)).map((m) => {
-            p = p.replace(
-              m[0],
-              `${m[1]}${
-                parseInt(m[2]) +
-                (formulaFromAbove ? rIdx + 1 : rIdx) +
-                appendOffset
-              }`
-            );
-          });
-
-          row[cIdx] = p;
-        }
-      });
+  rows.forEach((row, rIdx) => {
+    const formulas = offsetFormulas(
+      pctx.formulas,
+      position + rIdx - 1,
+      pctx.linkIdxes
+    );
+    formulas.forEach((value, cIdx) => {
+      if (value != "") row[cIdx] = value;
     });
-  }
-
-  rows.forEach(() =>
-    newRange
-      .offset(1 + appendOffset, 0, 1)
-      .insertCells(SpreadsheetApp.Dimension.ROWS)
-  );
-  pctx.checkboxes.forEach((idx) => {
-    newRange.offset(1 + appendOffset, idx, rows.length, 1).insertCheckboxes();
   });
-  newRange.offset(1 + appendOffset, 0, rows.length).setValues(rows);
+
+  newRange.offset(0, 0, rows.length).insertCells(SpreadsheetApp.Dimension.ROWS);
+  rows.forEach((row, rIdx) => {
+    row.forEach((value, cIdx) => {
+      if (
+        !pctx.readonlyIdxes.includes(cIdx) ||
+        pctx.formulaIdxes.includes(cIdx)
+      )
+        newRange.offset(rIdx, cIdx, 1, 1).setValue(value);
+    });
+  });
+
+  pctx.checkboxeIdxes.forEach((idx) => {
+    newRange.offset(0, idx, rows.length, 1).insertCheckboxes();
+  });
 
   pctx.rowCount += rows.length;
+
+  return rows.map((row) =>
+    entityFromRow<T>(row, pctx.columnsDef, pctx.headers)
+  );
 }
 
 export function deleteAt<T extends ColumnsMapping>(
@@ -225,7 +237,8 @@ export function updateAt<T extends ColumnsMapping>(
 
     const newRange = pctx.dataRange.offset(index + pctx.offsetTop + rIdx, 0, 1);
     row.forEach((value, cIdx) => {
-      if (value !== null) newRange.offset(0, cIdx, 1, 1).setValue(value);
+      if (value !== null && !pctx.readonlyIdxes.includes(cIdx))
+        newRange.offset(0, cIdx, 1, 1).setValue(value);
     });
   });
 }

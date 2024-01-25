@@ -49,16 +49,39 @@ export type ColumnValueTypeName<T extends ColumnValueType> = T extends Sequence
 export type ColumnDef<T extends ColumnValueType> = {
   type: ColumnValueTypeName<T>;
   id: number | string;
-  pk?: boolean;
 };
 export type ColumnDefKind = ColumnDef<ColumnValueType>;
 
+export type PkColumnDef<T extends ColumnValueType> = ColumnDef<T> & {
+  pk: true;
+};
+export type ReadOnlyColumnDef<T extends ColumnValueType> = ColumnDef<T> & {
+  ro: true;
+};
+export type FormulaColumnDef<T extends ColumnValueType> =
+  ReadOnlyColumnDef<T> & {
+    frm: true;
+  };
+
+export type ColumnDefVariant<T extends ColumnValueType> =
+  | ColumnDef<T>
+  | PkColumnDef<T>
+  | ReadOnlyColumnDef<T>
+  | FormulaColumnDef<T>;
+
 export type PropOfTypeNames<T extends ColumnsMapping, P> = {
-  [K in keyof T]: T[K] extends ColumnDef<infer V>
+  [K in keyof T]: T[K] extends ColumnDefVariant<infer V>
     ? V extends P
       ? K
       : never
     : never;
+}[keyof T];
+
+export type PropOfVariantNames<
+  T extends ColumnsMapping,
+  P extends ColumnDefVariant<any>
+> = {
+  [K in keyof T]: T[K] extends P ? K : never;
 }[keyof T];
 
 export type ColumnsMapping = {
@@ -67,8 +90,20 @@ export type ColumnsMapping = {
 
 export function primaryKey<T extends ColumnValueType>(
   def: ColumnDef<T>
-): ColumnDef<T> {
+): PkColumnDef<T> {
   return { ...def, pk: true };
+}
+
+export function readonly<T extends ColumnValueType>(
+  def: ColumnDef<T>
+): ReadOnlyColumnDef<T> {
+  return { ...def, ro: true };
+}
+
+export function formula<T extends ColumnValueType>(
+  def: ColumnDef<T>
+): FormulaColumnDef<T> {
+  return { ...def, ro: true, frm: true };
 }
 
 export function stringCol(id: number | string): ColumnDef<string> {
