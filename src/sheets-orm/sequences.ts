@@ -1,10 +1,15 @@
 import { ContextRef } from "./context";
-import { ColumnsMapping, PropOfTypeNames, Sequence } from "./schema";
+import {
+  ColumnsMapping,
+  PropOfTypeNames,
+  PropOfVariantNames,
+  SerialColumnDef,
+} from "./schema";
 import { Context, getObject } from "./utils";
 
 function seqEntryName<T extends ColumnsMapping>(
   ctx: ContextRef<T>,
-  key: PropOfTypeNames<T, Sequence>
+  key: PropOfVariantNames<T, SerialColumnDef<any>>
 ): string {
   const pctx: Context<T> = getObject(ctx);
   return Utilities.base64Encode(
@@ -19,7 +24,7 @@ function seqEntryName<T extends ColumnsMapping>(
 
 export function seqCurrent<T extends ColumnsMapping>(
   ctx: ContextRef<T>,
-  key: PropOfTypeNames<T, Sequence>
+  key: PropOfVariantNames<T, SerialColumnDef<any>>
 ): number | null {
   const pctx: Context<T> = getObject(ctx);
   const value = pctx.metadata.get(seqEntryName(ctx, key));
@@ -28,7 +33,7 @@ export function seqCurrent<T extends ColumnsMapping>(
 
 export function seqNext<T extends ColumnsMapping>(
   ctx: ContextRef<T>,
-  key: PropOfTypeNames<T, Sequence>
+  key: PropOfVariantNames<T, SerialColumnDef<any>>
 ): number {
   const pctx: Context<T> = getObject(ctx);
   const entryName = seqEntryName(ctx, key);
@@ -41,7 +46,7 @@ export function seqNext<T extends ColumnsMapping>(
 
 export function seqReset<T extends ColumnsMapping>(
   ctx: ContextRef<T>,
-  key: PropOfTypeNames<T, Sequence>,
+  key: PropOfVariantNames<T, SerialColumnDef<any>>,
   value?: number
 ): void {
   const pctx: Context<T> = getObject(ctx);

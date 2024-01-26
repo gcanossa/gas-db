@@ -7,7 +7,7 @@ import {
   RangeHeaders,
   rowFromEntity,
   RowObject,
-  sequenceCol,
+  serial,
   stringCol,
 } from "./sheets-orm";
 
@@ -18,7 +18,7 @@ describe("Row mapping", () => {
       name: stringCol(1),
       score: numberCol("Rank"),
       lnk: linkCol(3),
-      serial: sequenceCol(5),
+      serial: serial(numberCol(5)),
     };
 
     const headers: RangeHeaders = {
@@ -52,7 +52,7 @@ describe("Row mapping", () => {
       name: stringCol(1),
       score: numberCol("Rank"),
       lnk: linkCol(3),
-      serial: sequenceCol(5),
+      serial: serial(numberCol(5)),
     };
 
     const headers: RangeHeaders = {

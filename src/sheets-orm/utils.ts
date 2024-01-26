@@ -3,8 +3,8 @@ import { RangeHeaders } from "./core";
 import {
   ColumnsMapping,
   FormulaColumnDef,
-  PropOfTypeNames,
-  Sequence,
+  PropOfVariantNames,
+  SerialColumnDef,
 } from "./schema";
 
 export function trimIndex(index: number, count: number) {
@@ -91,7 +91,7 @@ export function hasFormulaColumns<T extends ColumnsMapping>(columns: T) {
   return (
     !!columns &&
     !!Object.keys(columns).find(
-      (k) => !!(columns[k] as FormulaColumnDef<any>)?.frm
+      (k) => !!(columns[k] as FormulaColumnDef<any>)?.formula
     )
   );
 }
@@ -104,7 +104,9 @@ export type Context<T extends ColumnsMapping> = {
   rowCount: number;
   dataRange: GoogleAppsScript.Spreadsheet.Range;
   headers: RangeHeaders | null;
-  sequenceNames: PropOfTypeNames<T, Sequence>[];
+  serialNames: PropOfVariantNames<T, SerialColumnDef<any>>[];
+  serialIdxes: number[];
+  generatedIdxes: number[];
   readonlyIdxes: number[];
   checkboxeIdxes: number[];
   linkIdxes: number[];

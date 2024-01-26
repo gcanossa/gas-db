@@ -1,5 +1,3 @@
-export type Sequence = { sequence: number };
-
 export type LinkAllowedSchema =
   | "http"
   | "https"
@@ -15,26 +13,16 @@ export type Link = {
   label?: string;
 };
 
-export type ColumnValueType =
-  | Sequence
-  | Link
-  | string
-  | number
-  | boolean
-  | Date
-  | null;
+export type ColumnValueType = Link | string | number | boolean | Date | null;
 
 export type ColumnValueTypeNames =
-  | "sequence"
   | "link"
   | "string"
   | "number"
   | "boolean"
   | "date";
 
-export type ColumnValueTypeName<T extends ColumnValueType> = T extends Sequence
-  ? "sequence"
-  : T extends Link
+export type ColumnValueTypeName<T extends ColumnValueType> = T extends Link
   ? "link"
   : T extends string
   ? "string"
@@ -49,25 +37,32 @@ export type ColumnValueTypeName<T extends ColumnValueType> = T extends Sequence
 export type ColumnDef<T extends ColumnValueType> = {
   type: ColumnValueTypeName<T>;
   id: number | string;
+  generated?: boolean;
 };
 export type ColumnDefKind = ColumnDef<ColumnValueType>;
 
 export type PkColumnDef<T extends ColumnValueType> = ColumnDef<T> & {
-  pk: true;
+  primaryKey: true;
 };
 export type ReadOnlyColumnDef<T extends ColumnValueType> = ColumnDef<T> & {
-  ro: true;
+  readonly: true;
 };
 export type FormulaColumnDef<T extends ColumnValueType> =
   ReadOnlyColumnDef<T> & {
-    frm: true;
+    formula: true;
+  };
+export type SerialColumnDef<T extends ColumnValueType> =
+  ReadOnlyColumnDef<T> & {
+    serial: true;
+    genFn?: (p: number) => T;
   };
 
 export type ColumnDefVariant<T extends ColumnValueType> =
   | ColumnDef<T>
   | PkColumnDef<T>
   | ReadOnlyColumnDef<T>
-  | FormulaColumnDef<T>;
+  | FormulaColumnDef<T>
+  | SerialColumnDef<T>;
 
 export type PropOfTypeNames<T extends ColumnsMapping, P> = {
   [K in keyof T]: T[K] extends ColumnDefVariant<infer V>
@@ -91,19 +86,32 @@ export type ColumnsMapping = {
 export function primaryKey<T extends ColumnValueType>(
   def: ColumnDef<T>
 ): PkColumnDef<T> {
-  return { ...def, pk: true };
+  return { ...def, primaryKey: true };
 }
 
 export function readonly<T extends ColumnValueType>(
   def: ColumnDef<T>
 ): ReadOnlyColumnDef<T> {
-  return { ...def, ro: true };
+  return { ...def, readonly: true };
 }
 
 export function formula<T extends ColumnValueType>(
   def: ColumnDef<T>
 ): FormulaColumnDef<T> {
-  return { ...def, ro: true, frm: true };
+  return { ...def, readonly: true, formula: true, generated: true };
+}
+
+export function serial<T extends ColumnValueType>(
+  def: ColumnDef<T>,
+  genFn?: (p: number) => T
+): SerialColumnDef<T> {
+  return {
+    ...def,
+    readonly: true,
+    serial: true,
+    genFn: genFn,
+    generated: true,
+  };
 }
 
 export function stringCol(id: number | string): ColumnDef<string> {
@@ -122,10 +130,6 @@ export function dateCol(id: number | string): ColumnDef<Date> {
   return { type: "date", id };
 }
 
-export function sequenceCol(id: number | string): ColumnDef<Sequence> {
-  return { type: "sequence", id };
-}
-
 export function linkCol(id: number | string): ColumnDef<Link> {
-  return { type: "link", id };
+  return { type: "link", id, generated: true };
 }

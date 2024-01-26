@@ -7,11 +7,13 @@ import {
   rowFromEntity,
 } from "./core";
 import {
+  ColumnDef,
   ColumnValueType,
   ColumnsMapping,
   PropOfTypeNames,
+  PropOfVariantNames,
   ReadOnlyColumnDef,
-  Sequence,
+  SerialColumnDef,
 } from "./schema";
 import { seqNext } from "./sequences";
 import {
@@ -64,9 +66,13 @@ export function createContext<T extends ColumnsMapping>(
     rowCount = !!firstRow.find((p) => p != "") ? rowCount : 0;
   }
 
-  const sequences = Object.keys(columns).filter(
-    (key) => columns[key].type === "sequence"
-  ) as PropOfTypeNames<T, Sequence>[];
+  const serialNames = Object.keys(columns).filter(
+    (key) => !!(columns[key] as SerialColumnDef<any>)?.serial
+  ) as PropOfVariantNames<T, SerialColumnDef<any>>[];
+
+  const serials: number[] = Object.keys(columns)
+    .filter((key) => !!(columns[key] as SerialColumnDef<any>)?.serial)
+    .map((key) => getColumnIndex(columns[key], headers));
 
   const checkboxes: number[] = Object.keys(columns)
     .filter((key) => columns[key].type === "boolean")
@@ -77,7 +83,11 @@ export function createContext<T extends ColumnsMapping>(
     .map((key) => getColumnIndex(columns[key], headers));
 
   const readonlys: number[] = Object.keys(columns)
-    .filter((key) => !!(columns[key] as ReadOnlyColumnDef<any>)?.ro)
+    .filter((key) => !!(columns[key] as ReadOnlyColumnDef<any>)?.readonly)
+    .map((key) => getColumnIndex(columns[key], headers));
+
+  const generateds: number[] = Object.keys(columns)
+    .filter((key) => !!(columns[key] as ColumnDef<any>)?.generated)
     .map((key) => getColumnIndex(columns[key], headers));
 
   if (!metadata) {
@@ -103,7 +113,9 @@ export function createContext<T extends ColumnsMapping>(
     dataRange: dataRange,
     offsetTop: offsetTop,
     metadata: metadata,
-    sequenceNames: sequences,
+    serialNames: serialNames,
+    serialIdxes: serials,
+    generatedIdxes: generateds,
     checkboxeIdxes: checkboxes,
     linkIdxes: links,
     formulas: formulas,
@@ -115,20 +127,24 @@ export function createContext<T extends ColumnsMapping>(
 }
 
 export function read<T extends ColumnsMapping>(
-  ctx: ContextRef<T>
+  ctx: ContextRef<T>,
+  offset: number = 0,
+  limit?: number
 ): RowObject<T>[] {
   const pctx: Context<T> = getObject(ctx);
 
+  limit = limit ?? pctx.rowCount;
+
   const dataRange =
-    pctx.rowCount > 0
-      ? pctx.dataRange.offset(pctx.offsetTop, 0, pctx.rowCount).getValues() ??
+    limit > 0
+      ? pctx.dataRange.offset(pctx.offsetTop + offset, 0, limit).getValues() ??
         []
       : [];
 
   if (pctx.linkIdxes.length > 0 && dataRange.length > 0) {
     pctx.linkIdxes.forEach((lnkIdx) => {
       const formulas = pctx.dataRange
-        .offset(pctx.offsetTop, lnkIdx, pctx.rowCount, 1)
+        .offset(pctx.offsetTop + offset, lnkIdx, limit, 1)
         .getFormulas();
 
       dataRange.forEach((row, rIdx) => {
@@ -160,8 +176,11 @@ export function insertAt<T extends ColumnsMapping>(
   const items = Array.isArray(inserts) ? inserts : [inserts];
 
   const rows: ColumnValueType[][] = items.map((item) => {
-    pctx.sequenceNames.map((key) => {
-      (item as Record<keyof T, any>)[key] = seqNext(ctx, key);
+    pctx.serialNames.map((key) => {
+      const cDef = pctx.columnsDef[key as string] as SerialColumnDef<any>;
+      (item as Record<keyof T, any>)[key] = !!cDef?.genFn
+        ? cDef.genFn(seqNext(ctx, key))
+        : seqNext(ctx, key);
     });
     return rowFromEntity<T>(
       item as any as Partial<RowObject<T>>,
@@ -190,7 +209,7 @@ export function insertAt<T extends ColumnsMapping>(
     row.forEach((value, cIdx) => {
       if (
         !pctx.readonlyIdxes.includes(cIdx) ||
-        pctx.formulaIdxes.includes(cIdx)
+        pctx.generatedIdxes.includes(cIdx)
       )
         newRange.offset(rIdx, cIdx, 1, 1).setValue(value);
     });
@@ -202,9 +221,7 @@ export function insertAt<T extends ColumnsMapping>(
 
   pctx.rowCount += rows.length;
 
-  return rows.map((row) =>
-    entityFromRow<T>(row, pctx.columnsDef, pctx.headers)
-  );
+  return read(ctx, index + appendOffset, rows.length);
 }
 
 export function deleteAt<T extends ColumnsMapping>(
@@ -224,11 +241,12 @@ export function updateAt<T extends ColumnsMapping>(
   ctx: ContextRef<T>,
   updates: UpdateRowObject<T> | UpdateRowObject<T>[],
   index: number
-): void {
+) {
   const pctx: Context<T> = getObject(ctx);
   index = trimIndex(index, pctx.rowCount);
 
-  (Array.isArray(updates) ? updates : [updates]).forEach((item, rIdx) => {
+  const items = Array.isArray(updates) ? updates : [updates];
+  items.forEach((item, rIdx) => {
     let row = rowFromEntity<T>(
       item as any as Partial<RowObject<T>>,
       pctx.columnsDef,
@@ -241,4 +259,6 @@ export function updateAt<T extends ColumnsMapping>(
         newRange.offset(0, cIdx, 1, 1).setValue(value);
     });
   });
+
+  return read(ctx, index, items.length);
 }

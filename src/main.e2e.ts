@@ -1,8 +1,5 @@
 import {
   ContextRef,
-  PkColumnDef,
-  PropOfVariantNames,
-  ReadOnlyColumnDef,
   add,
   booleanCol,
   commit,
@@ -18,11 +15,10 @@ import {
   numberCol,
   primaryKey,
   read,
-  readonly,
   remove,
   rollback,
   seqReset,
-  sequenceCol,
+  serial,
   stringCol,
   updateAt,
 } from "./sheets-orm";
@@ -108,6 +104,8 @@ function _test_suite(ctx: ContextRef<typeof mapping>) {
   assertEq(read(ctx).length, 3);
   assertEq(read(ctx)[0].id, 0);
   assertEq(read(ctx)[0].fseq, read(ctx)[0].seq * 2);
+  assertEq(read(ctx)[0].seq, 1);
+  assertEq(read(ctx)[2].seq, 3);
   assertEq(read(ctx)[0].seq, inserted[0].seq);
   assertEq(read(ctx)[2].seq, inserted[2].seq);
 
@@ -374,7 +372,7 @@ function _test_suite_managed(ctx: ContextRef<typeof mapping>) {
 const mapping = {
   id: primaryKey(numberCol("Num")),
   name: stringCol(1),
-  seq: sequenceCol(2),
+  seq: serial(numberCol(2)),
   fseq: formula(numberCol(3)),
   score: booleanCol("Rank"),
   link: linkCol("Link"),
