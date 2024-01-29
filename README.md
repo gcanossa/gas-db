@@ -1,3 +1,13 @@
+# DEPRECATED
+
+THe package has been refactored and organized under the organization [_@gasstack_](https://www.npmjs.com/search?q=%40gasstack).
+
+In particular, for the functionalities here implemented:
+
+- [@gasstack/db](https://www.npmjs.com/package/@gasstack/db)
+- [@gasstack/kv](https://www.npmjs.com/package/@gasstack/kv)
+- [@gasstack/fs](https://www.npmjs.com/package/@gasstack/fs)
+
 # @gcanossa/gas-db
 
 Google Apps Script Database microframework
